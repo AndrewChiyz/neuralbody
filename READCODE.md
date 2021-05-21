@@ -1,5 +1,5 @@
-
-# Dataloader (for data preparation)
+# Neural-Body Code Reading
+This repository is forked from [[zju3dv/neuralbody](https://github.com/zju3dv/neuralbody)] and aims to record some comments in the code-reading.
 ## Pre-defined or pre-computed parameters for transformation 
 There are two sets of transformation parameters.
 The first set of transformation parameters is stored in the `dataset/params/*.npy` for each frame. It contains the rotation vector `Rh`, which is a 1x3 angle-axis rotation vector, and the translation transformation parameter `Th`, which is a 1x3 vector, this transformation parameters are utilized to transform vertices on a smpl model from the world coordinate to the smpl coordinate. 
