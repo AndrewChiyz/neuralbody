@@ -1,7 +1,7 @@
-import torch.nn as nn
 import spconv
-import torch.nn.functional as F
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
 from lib.config import cfg
 
 
@@ -27,15 +27,15 @@ class Network(nn.Module):
         self.rgb_fc = nn.Conv1d(128, 3, 1)
 
     def forward(self, sp_input, grid_coords, viewdir, light_pts):
-        feature = sp_input['feature']
-        coord = sp_input['coord']
-        out_sh = sp_input['out_sh']
-        batch_size = sp_input['batch_size']
+        feature = sp_input["feature"]
+        coord = sp_input["coord"]
+        out_sh = sp_input["out_sh"]
+        batch_size = sp_input["batch_size"]
 
         p_features = grid_coords.transpose(1, 2)
         grid_coords = grid_coords[:, None, None]
 
-        xyz = feature[..., :3]
+        # ? xyz = feature[..., :3]  # [bs, 6890, 3]
         code = self.c(torch.arange(0, 6890).to(p_features.device))
         # xyzc = torch.cat((xyz, code), dim=1)
         xyzc = spconv.SparseConvTensor(code, coord, out_sh, batch_size)
@@ -50,7 +50,7 @@ class Network(nn.Module):
 
         features = self.feature_fc(net)
 
-        latent = self.latent(sp_input['i'])
+        latent = self.latent(sp_input["i"])
         latent = latent[..., None].expand(*latent.shape, net.size(2))
         features = torch.cat((features, latent), dim=1)
         features = self.latent_fc(features)
@@ -71,19 +71,19 @@ class SparseConvNet(nn.Module):
     def __init__(self):
         super(SparseConvNet, self).__init__()
 
-        self.conv0 = double_conv(16, 16, 'subm0')
-        self.down0 = stride_conv(16, 32, 'down0')
+        self.conv0 = double_conv(16, 16, "subm0")
+        self.down0 = stride_conv(16, 32, "down0")
 
-        self.conv1 = double_conv(32, 32, 'subm1')
-        self.down1 = stride_conv(32, 64, 'down1')
+        self.conv1 = double_conv(32, 32, "subm1")
+        self.down1 = stride_conv(32, 64, "down1")
 
-        self.conv2 = triple_conv(64, 64, 'subm2')
-        self.down2 = stride_conv(64, 128, 'down2')
+        self.conv2 = triple_conv(64, 64, "subm2")
+        self.down2 = stride_conv(64, 128, "down2")
 
-        self.conv3 = triple_conv(128, 128, 'subm3')
-        self.down3 = stride_conv(128, 128, 'down3')
+        self.conv3 = triple_conv(128, 128, "subm3")
+        self.down3 = stride_conv(128, 128, "down3")
 
-        self.conv4 = triple_conv(128, 128, 'subm4')
+        self.conv4 = triple_conv(128, 128, "subm4")
 
     def forward(self, x, grid_coords):
         net = self.conv0(x)
@@ -91,37 +91,32 @@ class SparseConvNet(nn.Module):
 
         net = self.conv1(net)
         net1 = net.dense()
-        feature_1 = F.grid_sample(net1,
-                                  grid_coords,
-                                  padding_mode='zeros',
-                                  align_corners=True)
+        feature_1 = F.grid_sample(
+            net1, grid_coords, padding_mode="zeros", align_corners=True
+        )
         net = self.down1(net)
 
         net = self.conv2(net)
         net2 = net.dense()
-        feature_2 = F.grid_sample(net2,
-                                  grid_coords,
-                                  padding_mode='zeros',
-                                  align_corners=True)
+        feature_2 = F.grid_sample(
+            net2, grid_coords, padding_mode="zeros", align_corners=True
+        )
         net = self.down2(net)
 
         net = self.conv3(net)
         net3 = net.dense()
-        feature_3 = F.grid_sample(net3,
-                                  grid_coords,
-                                  padding_mode='zeros',
-                                  align_corners=True)
+        feature_3 = F.grid_sample(
+            net3, grid_coords, padding_mode="zeros", align_corners=True
+        )
         net = self.down3(net)
 
         net = self.conv4(net)
         net4 = net.dense()
-        feature_4 = F.grid_sample(net4,
-                                  grid_coords,
-                                  padding_mode='zeros',
-                                  align_corners=True)
+        feature_4 = F.grid_sample(
+            net4, grid_coords, padding_mode="zeros", align_corners=True
+        )
 
-        features = torch.cat((feature_1, feature_2, feature_3, feature_4),
-                             dim=1)
+        features = torch.cat((feature_1, feature_2, feature_3, feature_4), dim=1)
         features = features.view(features.size(0), -1, features.size(4))
 
         return features
@@ -129,11 +124,9 @@ class SparseConvNet(nn.Module):
 
 def single_conv(in_channels, out_channels, indice_key=None):
     return spconv.SparseSequential(
-        spconv.SubMConv3d(in_channels,
-                          out_channels,
-                          1,
-                          bias=False,
-                          indice_key=indice_key),
+        spconv.SubMConv3d(
+            in_channels, out_channels, 1, bias=False, indice_key=indice_key
+        ),
         nn.BatchNorm1d(out_channels, eps=1e-3, momentum=0.01),
         nn.ReLU(),
     )
@@ -141,18 +134,14 @@ def single_conv(in_channels, out_channels, indice_key=None):
 
 def double_conv(in_channels, out_channels, indice_key=None):
     return spconv.SparseSequential(
-        spconv.SubMConv3d(in_channels,
-                          out_channels,
-                          3,
-                          bias=False,
-                          indice_key=indice_key),
+        spconv.SubMConv3d(
+            in_channels, out_channels, 3, bias=False, indice_key=indice_key
+        ),
         nn.BatchNorm1d(out_channels, eps=1e-3, momentum=0.01),
         nn.ReLU(),
-        spconv.SubMConv3d(out_channels,
-                          out_channels,
-                          3,
-                          bias=False,
-                          indice_key=indice_key),
+        spconv.SubMConv3d(
+            out_channels, out_channels, 3, bias=False, indice_key=indice_key
+        ),
         nn.BatchNorm1d(out_channels, eps=1e-3, momentum=0.01),
         nn.ReLU(),
     )
@@ -160,25 +149,19 @@ def double_conv(in_channels, out_channels, indice_key=None):
 
 def triple_conv(in_channels, out_channels, indice_key=None):
     return spconv.SparseSequential(
-        spconv.SubMConv3d(in_channels,
-                          out_channels,
-                          3,
-                          bias=False,
-                          indice_key=indice_key),
+        spconv.SubMConv3d(
+            in_channels, out_channels, 3, bias=False, indice_key=indice_key
+        ),
         nn.BatchNorm1d(out_channels, eps=1e-3, momentum=0.01),
         nn.ReLU(),
-        spconv.SubMConv3d(out_channels,
-                          out_channels,
-                          3,
-                          bias=False,
-                          indice_key=indice_key),
+        spconv.SubMConv3d(
+            out_channels, out_channels, 3, bias=False, indice_key=indice_key
+        ),
         nn.BatchNorm1d(out_channels, eps=1e-3, momentum=0.01),
         nn.ReLU(),
-        spconv.SubMConv3d(out_channels,
-                          out_channels,
-                          3,
-                          bias=False,
-                          indice_key=indice_key),
+        spconv.SubMConv3d(
+            out_channels, out_channels, 3, bias=False, indice_key=indice_key
+        ),
         nn.BatchNorm1d(out_channels, eps=1e-3, momentum=0.01),
         nn.ReLU(),
     )
@@ -186,11 +169,15 @@ def triple_conv(in_channels, out_channels, indice_key=None):
 
 def stride_conv(in_channels, out_channels, indice_key=None):
     return spconv.SparseSequential(
-        spconv.SparseConv3d(in_channels,
-                            out_channels,
-                            3,
-                            2,
-                            padding=1,
-                            bias=False,
-                            indice_key=indice_key),
-        nn.BatchNorm1d(out_channels, eps=1e-3, momentum=0.01), nn.ReLU())
+        spconv.SparseConv3d(
+            in_channels,
+            out_channels,
+            3,
+            2,
+            padding=1,
+            bias=False,
+            indice_key=indice_key,
+        ),
+        nn.BatchNorm1d(out_channels, eps=1e-3, momentum=0.01),
+        nn.ReLU(),
+    )

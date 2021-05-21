@@ -1,17 +1,17 @@
-import numpy as np
-from lib.utils import base_utils
 import cv2
-from lib.config import cfg
+import numpy as np
 import trimesh
+from lib.config import cfg
+from lib.utils import base_utils
 
 
 def get_rays(H, W, K, R, T):
     # calculate the camera origin
     rays_o = -np.dot(R.T, T).ravel()
     # calculate the world coodinates of pixels
-    i, j = np.meshgrid(np.arange(W, dtype=np.float32),
-                       np.arange(H, dtype=np.float32),
-                       indexing='xy')
+    i, j = np.meshgrid(
+        np.arange(W, dtype=np.float32), np.arange(H, dtype=np.float32), indexing="xy"
+    )
     xy1 = np.stack([i, j, np.ones_like(i)], axis=2)
     pixel_camera = np.dot(xy1, np.linalg.inv(K).T)
     pixel_world = np.dot(pixel_camera - T.ravel(), R)
@@ -24,16 +24,18 @@ def get_rays(H, W, K, R, T):
 def get_bound_corners(bounds):
     min_x, min_y, min_z = bounds[0]
     max_x, max_y, max_z = bounds[1]
-    corners_3d = np.array([
-        [min_x, min_y, min_z],
-        [min_x, min_y, max_z],
-        [min_x, max_y, min_z],
-        [min_x, max_y, max_z],
-        [max_x, min_y, min_z],
-        [max_x, min_y, max_z],
-        [max_x, max_y, min_z],
-        [max_x, max_y, max_z],
-    ])
+    corners_3d = np.array(
+        [
+            [min_x, min_y, min_z],
+            [min_x, min_y, max_z],
+            [min_x, max_y, min_z],
+            [min_x, max_y, max_z],
+            [max_x, min_y, min_z],
+            [max_x, min_y, max_z],
+            [max_x, max_y, min_z],
+            [max_x, max_y, max_z],
+        ]
+    )
     return corners_3d
 
 
@@ -63,16 +65,17 @@ def get_near_far(bounds, ray_o, ray_d):
     # calculate the intersections located at the 3d bounding box
     min_x, min_y, min_z, max_x, max_y, max_z = bounds.ravel()
     eps = 1e-6
-    p_mask_at_box = (p_intersect[..., 0] >= (min_x - eps)) * \
-                    (p_intersect[..., 0] <= (max_x + eps)) * \
-                    (p_intersect[..., 1] >= (min_y - eps)) * \
-                    (p_intersect[..., 1] <= (max_y + eps)) * \
-                    (p_intersect[..., 2] >= (min_z - eps)) * \
-                    (p_intersect[..., 2] <= (max_z + eps))
+    p_mask_at_box = (
+        (p_intersect[..., 0] >= (min_x - eps))
+        * (p_intersect[..., 0] <= (max_x + eps))
+        * (p_intersect[..., 1] >= (min_y - eps))
+        * (p_intersect[..., 1] <= (max_y + eps))
+        * (p_intersect[..., 2] >= (min_z - eps))
+        * (p_intersect[..., 2] <= (max_z + eps))
+    )
     # obtain the intersections of rays which intersect exactly twice
     mask_at_box = p_mask_at_box.sum(-1) == 2
-    p_intervals = p_intersect[mask_at_box][p_mask_at_box[mask_at_box]].reshape(
-        -1, 2, 3)
+    p_intervals = p_intersect[mask_at_box][p_mask_at_box[mask_at_box]].reshape(-1, 2, 3)
 
     # calculate the step of intersections
     ray_o = ray_o[mask_at_box]
@@ -95,7 +98,7 @@ def sample_ray(img, msk, K, R, T, bounds, nrays, split):
 
     msk = msk * bound_mask
 
-    if split == 'train':
+    if split == "train":
         nsampled_rays = 0
         face_sample_ratio = cfg.face_sample_ratio
         body_sample_ratio = cfg.body_sample_ratio
@@ -114,13 +117,11 @@ def sample_ray(img, msk, K, R, T, bounds, nrays, split):
 
             # sample rays on body
             coord_body = np.argwhere(msk != 0)
-            coord_body = coord_body[np.random.randint(0, len(coord_body),
-                                                      n_body)]
+            coord_body = coord_body[np.random.randint(0, len(coord_body), n_body)]
             # sample rays on face
             coord_face = np.argwhere(msk == 13)
             if len(coord_face) > 0:
-                coord_face = coord_face[np.random.randint(
-                    0, len(coord_face), n_face)]
+                coord_face = coord_face[np.random.randint(0, len(coord_face), n_face)]
             # sample rays in the bound mask
             coord = np.argwhere(bound_mask == 1)
             coord = coord[np.random.randint(0, len(coord), n_rand)]
@@ -177,7 +178,7 @@ def sample_ray_h36m(img, msk, K, R, T, bounds, nrays, split):
     msk = msk * bound_mask
     bound_mask[msk == 100] = 0
 
-    if split == 'train':
+    if split == "train":
         nsampled_rays = 0
         face_sample_ratio = cfg.face_sample_ratio
         body_sample_ratio = cfg.body_sample_ratio
@@ -196,13 +197,11 @@ def sample_ray_h36m(img, msk, K, R, T, bounds, nrays, split):
 
             # sample rays on body
             coord_body = np.argwhere(msk == 1)
-            coord_body = coord_body[np.random.randint(0, len(coord_body),
-                                                      n_body)]
+            coord_body = coord_body[np.random.randint(0, len(coord_body), n_body)]
             # sample rays on face
             coord_face = np.argwhere(msk == 13)
             if len(coord_face) > 0:
-                coord_face = coord_face[np.random.randint(
-                    0, len(coord_face), n_face)]
+                coord_face = coord_face[np.random.randint(0, len(coord_face), n_face)]
             # sample rays in the bound mask
             coord = np.argwhere(bound_mask == 1)
             coord = coord[np.random.randint(0, len(coord), n_rand)]
@@ -294,7 +293,7 @@ def rotate_smpl(xyz, nxyz, t):
 
 def transform_can_smpl(xyz):
     center = np.array([0, 0, 0]).astype(np.float32)
-    rot = np.array([[np.cos(0), -np.sin(0)], [np.sin(0), np.cos(0)]])
+    rot = np.array([[np.cos(0), -np.sin(0)], [np.sin(0), np.cos(0)]])  # identity matrix
     rot = rot.astype(np.float32)
     trans = np.array([0, 0, 0]).astype(np.float32)
     if np.random.uniform() > cfg.rot_ratio:
@@ -325,9 +324,9 @@ def transform_can_smpl(xyz):
 
 def unproject(depth, K, R, T):
     H, W = depth.shape
-    i, j = np.meshgrid(np.arange(W, dtype=np.float32),
-                       np.arange(H, dtype=np.float32),
-                       indexing='xy')
+    i, j = np.meshgrid(
+        np.arange(W, dtype=np.float32), np.arange(H, dtype=np.float32), indexing="xy"
+    )
     xy1 = np.stack([i, j, np.ones_like(i)], axis=2)
     xyz = xy1 * depth[..., None]
     pts3d = np.dot(xyz, np.linalg.inv(K).T)
@@ -337,12 +336,12 @@ def unproject(depth, K, R, T):
 
 def sample_world_points(ray_o, ray_d, near, far, split):
     # calculate the steps for each ray
-    t_vals = np.linspace(0., 1., num=cfg.N_samples)
-    z_vals = near[..., None] * (1. - t_vals) + far[..., None] * t_vals
+    t_vals = np.linspace(0.0, 1.0, num=cfg.N_samples)
+    z_vals = near[..., None] * (1.0 - t_vals) + far[..., None] * t_vals
 
-    if cfg.perturb > 0. and split == 'train':
+    if cfg.perturb > 0.0 and split == "train":
         # get intervals between samples
-        mids = .5 * (z_vals[..., 1:] + z_vals[..., :-1])
+        mids = 0.5 * (z_vals[..., 1:] + z_vals[..., :-1])
         upper = np.concatenate([mids, z_vals[..., -1:]], -1)
         lower = np.concatenate([z_vals[..., :1], mids], -1)
         # stratified samples in those intervals
