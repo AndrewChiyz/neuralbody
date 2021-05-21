@@ -163,4 +163,4 @@ if __name__ == '__main__':
 - Ref: Benjamin Graham,et al. 3d semantic segmentation with submanifold sparse convolutional networks. In CVPR, 2018. [[Project](https://github.com/facebookresearch/SparseConvNet)]
 
 ## Unclear part
-- How to get the mesh from NeRF (Marching Cube algorithm)
+- How to get the mesh from NeRF (Marching Cube algorithm)?
